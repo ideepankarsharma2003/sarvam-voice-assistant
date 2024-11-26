@@ -3,3 +3,11 @@ pyaudio
 python-dotenv
 Requests
 tqdm
+pydub
+websockets 
+sounddevice 
+numpy
+# Install the Deepgram Python SDK
+# https://github.com/deepgram/deepgram-python-sdk
+deepgram-sdk
+fastapi[all]
