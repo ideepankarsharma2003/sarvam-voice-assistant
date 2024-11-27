@@ -11,3 +11,4 @@ numpy
 # https://github.com/deepgram/deepgram-python-sdk
 deepgram-sdk
 fastapi[all]
+elevenlabs

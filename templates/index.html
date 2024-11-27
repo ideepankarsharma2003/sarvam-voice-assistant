@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Live Transcription</title>
-    </head>
-    <body>
-        <h1>Transcribe Audio With Deepgram</h1>
-        <p id="status">Connection status will go here</p>
-        <p id="transcript"></p>
 
-        <script>
-               navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+<head>
+    <title>Live Transcription</title>
+</head>
+
+<body>
+    <h1>Deepgram | 11Labs  | LlaMA3.2 1B</h1>
+    <p id="status">Connection status will go here</p>
+    <p id="transcript"></p>
+
+    <script>
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
             if (!MediaRecorder.isTypeSupported('audio/webm'))
                 return alert('Browser not supported')
 
@@ -26,27 +28,36 @@
                     if (event.data.size > 0 && socket.readyState == 1) {
                         socket.send(event.data)
                     }
-            })
-            mediaRecorder.start(250)
+                })
+                mediaRecorder.start(250)
             }
 
-            socket.onmessage = (message) => {
+            /* socket.onmessage = (message) => {
                 const received = message.data
                 if (received) {
                     console.log(received)
                     document.querySelector('#transcript').textContent += ' ' + received
                 }
-           }
+           } */
+            socket.onmessage = (message) => {
+                const received = message.data;
+                if (received) {
+                    console.log(received);
+                    document.querySelector('#transcript').innerHTML += ' ' + received;
+                }
+            };
 
-           socket.onclose = () => {
-            console.log({ event: 'onclose' })
-        }
+
+            socket.onclose = () => {
+                console.log({ event: 'onclose' })
+            }
 
             socket.onerror = (error) => {
                 console.log({ event: 'onerror', error })
             }
 
-           })
-        </script>
-    </body>
+        })
+    </script>
+</body>
+
 </html>
