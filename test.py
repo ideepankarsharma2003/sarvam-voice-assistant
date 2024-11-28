@@ -1,89 +1,75 @@
-# Example filename: main.py
+import webrtcvad
+import collections
+import numpy as np
+import asyncio
 
-import httpx
-import logging
-from deepgram.utils import verboselogs
-import threading
-from dotenv import load_dotenv
-from deepgram import (
-    DeepgramClient,
-    DeepgramClientOptions,
-    LiveTranscriptionEvents,
-    LiveOptions,
-)
-import os
+async def websocket_endpoint(websocket: WebSocket):
+    vad = webrtcvad.Vad()
+    vad.set_mode(3)  # Adjust aggressiveness: 0 (low) to 3 (high)
 
-load_dotenv()
+    # Settings for silence detection
+    sample_rate = 16000  # Assuming 16 kHz audio
+    frame_duration_ms = 30  # Frame size in ms
+    chunk_size = int(sample_rate * frame_duration_ms / 1000) * 2  # Bytes per frame
+    silence_threshold = 1.0  # Seconds of silence to consider speech ended
 
-# URL for the realtime streaming audio you would like to transcribe
-URL = "http://stream.live.vc.bbcmedia.co.uk/bbc_world_service"
+    ring_buffer = collections.deque(maxlen=int(silence_threshold / (frame_duration_ms / 1000)))
+    speech_detected = False
+    buffer_audio = b''
 
+    await websocket.accept()
 
-def main():
     try:
-        # use default config
-        deepgram: DeepgramClient = DeepgramClient(api_key=os.environ["DEEPGRAM_API_KEY"], config = DeepgramClientOptions(
-    verbose=logging.WARN,  # Change to logging.INFO or logging.DEBUG for more verbose output
-    options={"keepalive": "true"}
-))
+        while True:
+            data = await websocket.receive_bytes()
+            buffer_audio += data
 
-        # Create a websocket connection to Deepgram
-        dg_connection = deepgram.listen.websocket.v("1")
+            # Process the audio in chunks
+            while len(buffer_audio) >= chunk_size:
+                chunk = buffer_audio[:chunk_size]
+                buffer_audio = buffer_audio[chunk_size:]
 
-        def on_message(self, result, **kwargs):
-            sentence = result.channel.alternatives[0].transcript
-            if len(sentence) == 0:
-                return
-            print(f"speaker: {sentence}")
+                is_speech = vad.is_speech(chunk, sample_rate)
+                ring_buffer.append(is_speech)
 
-        dg_connection.on(LiveTranscriptionEvents.Transcript, on_message)
-
-        # connect to websocket
-        options = LiveOptions(model="nova-2")
-
-        print("\n\nPress Enter to stop recording...\n\n")
-        if dg_connection.start(options) is False:
-            print("Failed to start connection")
-            return
-
-        lock_exit = threading.Lock()
-        exit = False
-
-        # define a worker thread
-        def myThread():
-            with httpx.stream("GET", URL) as r:
-                for data in r.iter_bytes():
-                    lock_exit.acquire()
-                    if exit:
-                        break
-                    lock_exit.release()
-
-                    dg_connection.send(data)
-
-        # start the worker thread
-        myHttp = threading.Thread(target=myThread)
-        myHttp.start()
-
-        # signal finished
-        input("")
-        lock_exit.acquire()
-        exit = True
-        lock_exit.release()
-
-        # Wait for the HTTP thread to close and join
-        myHttp.join()
-
-        # Indicate that we've finished
-        dg_connection.finish()
-
-        print("Finished")
+                # Check for end of speech
+                if any(ring_buffer):  # Speech detected
+                    speech_detected = True
+                elif speech_detected:  # Silence detected after speech
+                    # Finalize speech segment
+                    speech_detected = False
+                    audio_segment = buffer_audio[:chunk_size]
+                    await process_audio(audio_segment, websocket)
 
     except Exception as e:
-        print(f"Could not open socket: {e}")
-        return
-
-if __name__ == "__main__":
-    main()
+        print(f"Error: {e}")
+    finally:
+        await websocket.close()
 
 
-# main.py (python example)
+async def process_audio(audio_segment, websocket):
+    """
+    Handles audio processing after speech detection is complete.
+    """
+    # Convert audio to text using transcription service (e.g., Deepgram)
+    transcript = await transcribe_audio(audio_segment)
+    await websocket.send_text(f"<b>You:</b> {transcript}<br>")
+
+    # Generate AI response
+    response = openai_reasoning_agent([{"role": "user", "content": transcript}])
+    assistant_reply = response.choices[0].message.content.strip()
+    await websocket.send_text(f"<b>Adri:</b> {assistant_reply}<br>")
+
+    # Convert response to speech and play
+    audio = ElevenLabs(api_key=os.environ.get("ELEVEN_API_KEY")).generate(
+        text=assistant_reply, voice="tTQzD8U9VSnJgfwC6HbY", stream=True
+    )
+    play(audio)
+
+
+async def transcribe_audio(audio_segment):
+    """
+    Example function to handle audio transcription using Deepgram.
+    """
+    # Send `audio_segment` to Deepgram for transcription
+    return "transcribed text"  # Placeholder

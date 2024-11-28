@@ -14,14 +14,14 @@ client = OpenAI(
 
 
 
-def openai_reasoning_agent(messages:list):
+def openai_reasoning_agent(messages:list, stream=False):
     completion = client.chat.completions.create(
-                model="meta-llama/llama-3.2-3b-instruct:free",
-                messages=messages
+                model="google/gemma-2-9b-it:free",
+                messages=messages,
+                stream=stream
                 )
+    return completion
 
-    reasoning_response =    completion.choices[0].message.content.strip()
-    resp= {"role": "assistant", "content": reasoning_response}
-    messages.append(resp)
-    return reasoning_response, messages
+    
+
 
